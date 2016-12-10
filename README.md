@@ -1,6 +1,8 @@
 
 ### Using I2C Serial Interface Module For 1602 LCD Display
 
+![](https://www.brobwind.com/wp-content/uploads/2016/12/2016_12_10_lcdiic.png)
+
 #### Hardware requirements:
 ###### 1. STM32F030F4-DEV V1.0
 
