@@ -27,63 +27,78 @@
 /* Driver local functions.                                                   */
 /*===========================================================================*/
 
-static void __lcdiicWrite4bitLocked(LCDIICDriver *drvp, uint8_t val) {
-    PCF8574Driver *portdrvp = drvp->config->drvp;
-
-    drvp->port.u.dt = val & 0x0f;
-    pcf8574SetPort(portdrvp, drvp->port.v);
-
-    drvp->port.u.en = 0x01;
-    pcf8574SetPort(portdrvp, drvp->port.v);
-    (drvp->delayUs)(1);
-
-    drvp->port.u.en = 0x00;
-    pcf8574SetPort(portdrvp, drvp->port.v);
-    (drvp->delayUs)(1);
-}
-
-static msg_t __lcdiicRead4bitLocked(LCDIICDriver *drvp, uint8_t *val) {
-    PCF8574Driver *portdrvp = drvp->config->drvp;
-    lcdiic_port_cfg portval;
-    msg_t ret;
-
-    drvp->port.u.dt = 0x0F;
-    pcf8574SetPort(portdrvp, drvp->port.v);
-
-    drvp->port.u.en = 0x01;
-    pcf8574SetPort(portdrvp, drvp->port.v);
-    (drvp->delayUs)(1);
-
-    ret = pcf8574GetPort(portdrvp, &portval.v);
-    if (ret == MSG_OK) *val = portval.u.dt;
-
-    drvp->port.u.en = 0x00;
-    pcf8574SetPort(portdrvp, drvp->port.v);
-    (drvp->delayUs)(1);
-
-    return ret;
-}
-
 static void lcdiicWriteLocked(LCDIICDriver *drvp, lcdiic_bus_mode_t mode, uint8_t val) {
-    __lcdiicWrite4bitLocked(drvp, val >> 4);
+    PCF8574Driver *portdrvp = drvp->config->drvp;
+    uint8_t buf[6], cnt = 0;
 
-    if (mode != LCDIIC_BUS_MODE_8BIT) {
-        __lcdiicWrite4bitLocked(drvp, val);
+    drvp->port.u.dt = (val >> 4) & 0x0F;
+    buf[cnt++] = drvp->port.v;
+
+    drvp->port.u.en = 0x01;
+    buf[cnt++] = drvp->port.v;
+
+    drvp->port.u.en = 0x00;
+    buf[cnt++] = drvp->port.v;
+
+    if (mode == LCDIIC_BUS_MODE_8BIT) {
+        goto done;
     }
 
+    drvp->port.u.dt = (val >> 0) & 0x0F;
+    buf[cnt++] = drvp->port.v;
+
+    drvp->port.u.en = 0x01;
+    buf[cnt++] = drvp->port.v;
+
+    drvp->port.u.en = 0x00;
+    buf[cnt++] = drvp->port.v;
+
+done:
+    pcf8574SetPortMulti(portdrvp, 1, buf, cnt);
+
     // Max execution time(!Clear display & !Return home) is 37us when f(OSC) is 270kHz
-    (drvp->delayUs)(37);
+    drvp->delayUs(37);
 }
 
 static msg_t lcdiicReadLocked(LCDIICDriver *drvp, lcdiic_bus_mode_t mode, uint8_t *val) {
-    msg_t ret = __lcdiicRead4bitLocked(drvp, val);
+    PCF8574Driver *portdrvp = drvp->config->drvp;
+    lcdiic_port_cfg portval;
+    msg_t ret;
+    uint8_t buf[2];
 
-    if (mode != LCDIIC_BUS_MODE_8BIT && ret == MSG_OK) {
-        uint8_t tmp;
-        ret = __lcdiicRead4bitLocked(drvp, &tmp);
-        if (ret == MSG_OK) *val = (*val) << 4 | tmp;
+    drvp->port.u.dt = 0x0f;
+    buf[0] = drvp->port.v;
+    drvp->port.u.en = 0x01;
+    buf[1] = drvp->port.v;
+    pcf8574SetPortMulti(portdrvp, 1, buf, 2);
+
+    ret = pcf8574GetPortOnce(portdrvp, &portval.v);
+    if (ret != MSG_OK) goto out;
+
+    *val = portval.u.dt << 4;
+
+    if (mode == LCDIIC_BUS_MODE_8BIT) goto done;
+
+    drvp->port.u.en = 0x00;
+    buf[0] = drvp->port.v;
+    drvp->port.u.en = 0x01;
+    buf[1] = drvp->port.v;
+    pcf8574SetPortMulti(portdrvp, 1, buf, 2);
+
+    ret = pcf8574GetPortOnce(portdrvp, &portval.v);
+    if (ret != MSG_OK) goto out;
+
+    *val |= portval.u.dt;
+
+done:
+    drvp->port.u.en = 0x00;
+    pcf8574SetPortOnce(portdrvp, 1, drvp->port.v);
+
+    if (drvp->port.u.rs != 0x00 && drvp->port.u.rw != 0x01) {
+        drvp->delayUs(37);
     }
 
+out:
     return ret;
 }
 
@@ -146,7 +161,7 @@ static void setBacklight(void *ip, uint8_t on) {
     PCF8574Driver *portdrvp = drvp->config->drvp;
 
     drvp->port.u.bl = !!on;
-    pcf8574SetPort(portdrvp, drvp->port.v);
+    pcf8574SetPortOnce(portdrvp, 1, drvp->port.v);
 }
 
 static void toggleBacklight(void *ip) {
@@ -160,8 +175,8 @@ static void setDisplay(void *ip, uint8_t display, uint8_t cursor, uint8_t blink)
     uint8_t ctrl = 0;
 
     if (display)    ctrl |= LCD_DISPLAY_ON;
-    if (cursor)        ctrl |= LCD_CURSOR_ON;
-    if (blink)        ctrl |= LCD_CURSOR_BLINK_ON;
+    if (cursor)     ctrl |= LCD_CURSOR_ON;
+    if (blink)      ctrl |= LCD_CURSOR_BLINK_ON;
 
     lcdiicIrWrite(drvp, LCDIIC_BUS_MODE_4BIT, LCD_CMD_DISPLAY_CONTROL | ctrl);
 }
@@ -170,14 +185,14 @@ static void clearScreen(void *ip) {
     LCDIICDriver *drvp = (LCDIICDriver *)ip;
 
     lcdiicIrWrite(drvp, LCDIIC_BUS_MODE_4BIT, LCD_CMD_CLEAR_DISPLAY);
-    (drvp->delayMs)(2);
+    drvp->delayMs(2);
 }
 
 static void shiftContent(void *ip, uint8_t display, uint8_t right) {
     LCDIICDriver *drvp = (LCDIICDriver *)ip;
     uint8_t ctrl = 0;
     if (display)    ctrl |= LCD_SHIFT_DISPLAY;
-    if (right)        ctrl |= LCD_SHIFT_TO_RIGHT;
+    if (right)      ctrl |= LCD_SHIFT_TO_RIGHT;
     lcdiicIrWrite(drvp, LCDIIC_BUS_MODE_4BIT, LCD_CMD_CONTENT_SHIFT | ctrl);
 }
 
@@ -185,7 +200,7 @@ static void returnHome(void *ip) {
     LCDIICDriver *drvp = (LCDIICDriver *)ip;
 
     lcdiicIrWrite(drvp, LCDIIC_BUS_MODE_4BIT, LCD_CMD_RETURN_HOME);
-    (drvp->delayMs)(2);
+    drvp->delayMs(2);
 }
 
 static void updatePattern(void *ip, uint8_t pos, const uint8_t *pat) {
@@ -275,7 +290,7 @@ void lcdiicStart(LCDIICDriver *devp, const LCDIICConfig *config) {
     /* LCD Initialize - 4-Bit Interface */
 
     /* 1. Wait time > 40ms */
-    (devp->delayMs)(40);
+    devp->delayMs(40);
 
     /* 2. Mode selection: from unknown mode to 4-bit mode */
     /* https://en.wikipedia.org/wiki/Hitachi_HD44780_LCD_controller */
@@ -284,11 +299,11 @@ void lcdiicStart(LCDIICDriver *devp, const LCDIICConfig *config) {
     /* - State3: 4-bit mode, waiting for the second set of 4 bits */
     lcdiicIrWrite(devp, LCDIIC_BUS_MODE_8BIT, LCD_CMD_FUNCTION_SET | LCD_BUS_MODE);
     /* Wait time > 4.1ms */
-    (devp->delayMs)(5);
+    devp->delayMs(5);
 
     lcdiicIrWrite(devp, LCDIIC_BUS_MODE_8BIT, LCD_CMD_FUNCTION_SET | LCD_BUS_MODE);
     /* Wait time > 100us */
-    (devp->delayMs)(1);
+    devp->delayMs(1);
 
     /* The LCD is now in either state1 or state3 */
     lcdiicIrWrite(devp, LCDIIC_BUS_MODE_8BIT, LCD_CMD_FUNCTION_SET | LCD_BUS_MODE);

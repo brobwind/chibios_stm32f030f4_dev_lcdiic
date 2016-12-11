@@ -99,7 +99,7 @@ static void delayMs(uint32_t val) {
 }
 
 /* Primary LCD display thread */
-static THD_WORKING_AREA(waLcdDisplay, 512);
+static THD_WORKING_AREA(waLcdDisplay, 256);
 static __attribute__((noreturn)) THD_FUNCTION(LcdDisplay, arg) {
   (void)arg;
   chRegSetThreadName("LcdDisplay");
@@ -126,15 +126,34 @@ static __attribute__((noreturn)) THD_FUNCTION(LcdDisplay, arg) {
     for (idx = 0; idx < sizeof(SYMBOL) / sizeof(SYMBOL[0]); idx++) {
         lcdiicUpdatePattern(&LCDIICD1, idx, SYMBOL[idx]);
     }
+
+    for (idx = 0; idx < sizeof(SYMBOL) / sizeof(SYMBOL[0][0]); idx++) {
+        uint8_t tmp;
+        lcdiicReadData(&LCDIICD1, 0, idx, &tmp);
+
+		if (idx % 8 == 0) {
+            chprintf((BaseSequentialStream *)&SD1, "---- dump pattern: %d ----\r\n", idx / 8);
+		}
+
+        chprintf((BaseSequentialStream*)&SD1, "%02x", tmp);
+        if (idx % 8 == 7) {
+            chprintf((BaseSequentialStream *)&SD1, "\r\n");
+        } else {
+            chprintf((BaseSequentialStream *)&SD1, " ");
+        }
+    }
   }
 
   while (true) {
     char buf[32];
+    systime_t millisec;
 
     chsnprintf(buf, sizeof(buf), "ChibiOS/RT %s", CH_KERNEL_VERSION);
     lcdiicDrawText(&LCDIICD1, 0, 0, buf, strlen(buf));
 
-    chsnprintf(buf, sizeof(buf), "TICK: %lu", (unsigned long)chVTGetSystemTime());
+    millisec = ST2MS(chVTGetSystemTime());
+    chsnprintf(buf, sizeof(buf), "%6d:%02d:%02d.%03d", millisec / 3600 / 1000,
+            (millisec / 60 / 1000) % 60, (millisec / 1000) % 60, millisec % 1000);
     lcdiicDrawText(&LCDIICD1, 1, 0, buf, strlen(buf));
 
     chThdSleepMilliseconds(200);
@@ -145,7 +164,7 @@ static __attribute__((noreturn)) THD_FUNCTION(LcdDisplay, arg) {
 }
 
 /* Secondary LCD display thread */
-static THD_WORKING_AREA(waLcdDisplayAdv, 512);
+static THD_WORKING_AREA(waLcdDisplayAdv, 256);
 static __attribute__((noreturn)) THD_FUNCTION(LcdDisplayAdv, arg) {
   (void)arg;
   uint8_t next = 0, ch, idx = 0;
