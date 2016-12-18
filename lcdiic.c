@@ -104,11 +104,11 @@ out:
 
 /* Write to instruction register */
 static void lcdiicIrWrite(LCDIICDriver *drvp, lcdiic_bus_mode_t mode, uint8_t val) {
-    osalMutexLock(&drvp->mutex);
+    chMtxLock(&drvp->mutex);
     drvp->port.u.rs = 0x00;
     drvp->port.u.rw = 0x00;
     lcdiicWriteLocked(drvp, mode, val);
-    osalMutexUnlock(&drvp->mutex);
+    chMtxUnlock(&drvp->mutex);
 }
 
 /* Check if busy: 0 - idle, 1 - busy  */
@@ -116,11 +116,11 @@ static int8_t lcdiicCheckBusy(LCDIICDriver *drvp, lcdiic_bus_mode_t mode, uint8_
     uint8_t val;
     msg_t ret;
 
-    osalMutexLock(&drvp->mutex);
+    chMtxLock(&drvp->mutex);
     drvp->port.u.rs = 0x00;
     drvp->port.u.rw = 0x01;
     ret = lcdiicReadLocked(drvp, mode, &val);
-    osalMutexUnlock(&drvp->mutex);
+    chMtxUnlock(&drvp->mutex);
 
     if (addr != NULL) {
         *addr = (ret == MSG_OK) ? (val & LCD_ADDRESS_COUNTER) : 0xff;
@@ -131,22 +131,22 @@ static int8_t lcdiicCheckBusy(LCDIICDriver *drvp, lcdiic_bus_mode_t mode, uint8_
 
 /* Write to data register */
 static void lcdiicDrWrite(LCDIICDriver *drvp, lcdiic_bus_mode_t mode, uint8_t val) {
-    osalMutexLock(&drvp->mutex);
+    chMtxLock(&drvp->mutex);
     drvp->port.u.rs = 0x01;
     drvp->port.u.rw = 0x00;
     lcdiicWriteLocked(drvp, mode, val);
-    osalMutexUnlock(&drvp->mutex);
+    chMtxUnlock(&drvp->mutex);
 }
 
 /* Read from data register */
 static msg_t lcdiicDrRead(LCDIICDriver *drvp, lcdiic_bus_mode_t mode, uint8_t *val) {
     msg_t ret;
 
-    osalMutexLock(&drvp->mutex);
+    chMtxLock(&drvp->mutex);
     drvp->port.u.rs = 0x01;
     drvp->port.u.rw = 0x01;
     ret = lcdiicReadLocked(drvp, mode, val);
-    osalMutexUnlock(&drvp->mutex);
+    chMtxUnlock(&drvp->mutex);
 
     return ret;
 }
@@ -274,15 +274,15 @@ void lcdiicObjectInit(LCDIICDriver *devp, void (*delayUs)(uint32_t), void (*dela
 
     devp->config = NULL;
 
-    osalMutexObjectInit(&devp->mutex);
+    chMtxObjectInit(&devp->mutex);
 
     devp->state = LCDIIC_STOP;
 }
 
 void lcdiicStart(LCDIICDriver *devp, const LCDIICConfig *config) {
-    osalDbgCheck((devp != NULL) && (config != NULL));
+    chDbgCheck((devp != NULL) && (config != NULL));
 
-    osalDbgAssert((devp->state == LCDIIC_STOP) || (devp->state == LCDIIC_READY),
+    chDbgAssert((devp->state == LCDIIC_STOP) || (devp->state == LCDIIC_READY),
             "lcdiicStart(), invalid state");
 
     devp->config = config;
@@ -336,13 +336,13 @@ void lcdiicStart(LCDIICDriver *devp, const LCDIICConfig *config) {
 }
 
 void lcdiicStop(LCDIICDriver *devp) {
-    osalDbgAssert((devp->state == LCDIIC_STOP) || (devp->state == LCDIIC_READY),
+    chDbgAssert((devp->state == LCDIIC_STOP) || (devp->state == LCDIIC_READY),
             "lcdiicStop(), invalid state");
 
     /* 1. Display off */
     setDisplay(devp, 0, 0, 0);
 
-    /* 2. Blacklight off */
+    /* 2. Backlight off */
     setBacklight(devp, 0);
 
     devp->state = LCDIIC_STOP;
