@@ -92,7 +92,7 @@ include $(CHIBIOS)/os/common/startup/ARMCMx/compilers/GCC/mk/startup_stm32f0xx.m
 # HAL-OSAL files (optional).
 include $(CHIBIOS)/os/hal/hal.mk
 include $(CHIBIOS)/os/hal/ports/STM32/STM32F0xx/platform.mk
-include $(CHIBIOS)/os/hal/boards/STM32F030F4_DEV_V1_0/board.mk
+include $(CHIBIOS)/../stm32f030f4-dev-v1.0/board.mk
 include $(CHIBIOS)/os/hal/osal/rt/osal.mk
 # RTOS files (optional).
 include $(CHIBIOS)/os/rt/rt.mk
@@ -103,7 +103,7 @@ include $(CHIBIOS)/os/hal/lib/streams/streams.mk
 include $(CHIBIOS)/os/various/shell/shell.mk
 
 # Define linker script file here
-LDSCRIPT= $(STARTUPLD)/STM32F030x4.ld
+LDSCRIPT = stm32f030f4-dev-v1.0/STM32F030x4.ld
 
 # C sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
