@@ -54,7 +54,7 @@ static void lcdiicWriteLocked(LCDIICDriver *drvp, lcdiic_bus_mode_t mode, uint8_
     buf[cnt++] = drvp->port.v;
 
 done:
-    pcf8574SetPortMulti(portdrvp, 1, buf, cnt);
+    pcf8574SetPort(portdrvp, 1, buf, cnt);
 
     // Max execution time(!Clear display & !Return home) is 37us when f(OSC) is 270kHz
     drvp->delayUs(37);
@@ -70,9 +70,9 @@ static msg_t lcdiicReadLocked(LCDIICDriver *drvp, lcdiic_bus_mode_t mode, uint8_
     buf[0] = drvp->port.v;
     drvp->port.u.en = 0x01;
     buf[1] = drvp->port.v;
-    pcf8574SetPortMulti(portdrvp, 1, buf, 2);
+    pcf8574SetPort(portdrvp, 1, buf, 2);
 
-    ret = pcf8574GetPortOnce(portdrvp, &portval.v);
+    ret = pcf8574GetPortOb(portdrvp, &portval.v);
     if (ret != MSG_OK) goto out;
 
     *val = portval.u.dt << 4;
@@ -83,16 +83,16 @@ static msg_t lcdiicReadLocked(LCDIICDriver *drvp, lcdiic_bus_mode_t mode, uint8_
     buf[0] = drvp->port.v;
     drvp->port.u.en = 0x01;
     buf[1] = drvp->port.v;
-    pcf8574SetPortMulti(portdrvp, 1, buf, 2);
+    pcf8574SetPort(portdrvp, 1, buf, 2);
 
-    ret = pcf8574GetPortOnce(portdrvp, &portval.v);
+    ret = pcf8574GetPortOb(portdrvp, &portval.v);
     if (ret != MSG_OK) goto out;
 
     *val |= portval.u.dt;
 
 done:
     drvp->port.u.en = 0x00;
-    pcf8574SetPortOnce(portdrvp, 1, drvp->port.v);
+    pcf8574SetPortOb(portdrvp, 1, drvp->port.v);
 
     if (drvp->port.u.rs != 0x00 && drvp->port.u.rw != 0x01) {
         drvp->delayUs(37);
@@ -161,7 +161,7 @@ static void setBacklight(void *ip, uint8_t on) {
     PCF8574Driver *portdrvp = drvp->config->drvp;
 
     drvp->port.u.bl = !!on;
-    pcf8574SetPortOnce(portdrvp, 1, drvp->port.v);
+    pcf8574SetPortOb(portdrvp, 1, drvp->port.v);
 }
 
 static void toggleBacklight(void *ip) {

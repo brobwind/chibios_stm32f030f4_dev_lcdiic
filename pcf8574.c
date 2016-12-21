@@ -35,7 +35,7 @@ static msg_t pcf8574WriteRegister(I2CDriver *i2cp, pcf8574_sad_t sad, uint8_t *t
     return i2cMasterTransmitTimeout(i2cp, sad, txbuf, n, NULL, 0, TIME_INFINITE);
 }
 
-static msg_t set_port_multi(void *ip, uint8_t modify, uint8_t *val, uint8_t len) {
+static msg_t setPort(void *ip, uint8_t modify, uint8_t *val, uint8_t len) {
     uint8_t ret;
     const PCF8574Driver *drv = (PCF8574Driver *)ip;
 
@@ -55,7 +55,7 @@ static msg_t set_port_multi(void *ip, uint8_t modify, uint8_t *val, uint8_t len)
     return ret;
 }
 
-static msg_t get_port_multi(void *ip, uint8_t *val, uint8_t len) {
+static msg_t getPort(void *ip, uint8_t *val, uint8_t len) {
     msg_t ret;
     const PCF8574Driver *drv = (PCF8574Driver *)ip;
 
@@ -69,17 +69,17 @@ static msg_t get_port_multi(void *ip, uint8_t *val, uint8_t len) {
     return ret;
 }
 
-static msg_t set_port_once(void *ip, uint8_t modify, uint8_t val) {
-    return set_port_multi(ip, modify, &val, 1);
+static msg_t setPortOb(void *ip, uint8_t modify, uint8_t val) {
+    return setPort(ip, modify, &val, 1);
 }
 
-static msg_t get_port_once(void *ip, uint8_t *val) {
-    return get_port_multi(ip, val, 1);
+static msg_t getPortOb(void *ip, uint8_t *val) {
+    return getPort(ip, val, 1);
 }
 
 static const struct PCF8574VMT vmt_pcf8574 = {
-    set_port_multi, get_port_multi,
-    set_port_once, get_port_once
+    setPort, getPort,
+    setPortOb, getPortOb
 };
 
 /*===========================================================================*/
@@ -94,26 +94,26 @@ void pcf8574ObjectInit(PCF8574Driver *devp) {
 }
 
 void pcf8574Start(PCF8574Driver *devp, const PCF8574Config *config) {
-    osalDbgCheck((devp != NULL) && (config != NULL));
+    chDbgCheck((devp != NULL) && (config != NULL));
 
-    osalDbgAssert((devp->state == PCF8574_STOP) || (devp->state == PCF8574_READY),
+    chDbgAssert((devp->state == PCF8574_STOP) || (devp->state == PCF8574_READY),
             "pcf8574Start(), invalid state");
 
     devp->config = config;
 
     /* Init port */
-    set_port_once(devp, 0, devp->config->mask | devp->config->value);
+    setPortOb(devp, 0, devp->config->mask | devp->config->value);
 
     devp->state = PCF8574_READY;
 }
 
 void pcf8574Stop(PCF8574Driver *devp) {
-    osalDbgAssert((devp->state == PCF8574_STOP) || (devp->state == PCF8574_READY),
+    chDbgAssert((devp->state == PCF8574_STOP) || (devp->state == PCF8574_READY),
             "pcf8574Stop(), invalid state");
 
     if (devp->state == PCF8574_READY) {
         /* Set all I/O pin to input */
-        set_port_once(devp, 0, 0xff);
+        setPortOb(devp, 0, 0xff);
     }
 
     devp->state = PCF8574_STOP;

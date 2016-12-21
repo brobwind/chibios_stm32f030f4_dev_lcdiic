@@ -68,10 +68,10 @@ typedef struct {
 } PCF8574Config;
 
 #define _pcf8574_methods \
-    msg_t (*set_port_multi)(void *instance, uint8_t modify, uint8_t *val, uint8_t len); \
-    msg_t (*get_port_multi)(void *instance, uint8_t *val, uint8_t len); \
-    msg_t (*set_port_once)(void *instance, uint8_t modify, uint8_t val); \
-    msg_t (*get_port_once)(void *instance, uint8_t *val); \
+    msg_t (*setPort)(void *instance, uint8_t modify, uint8_t *val, uint8_t len); \
+    msg_t (*getPort)(void *instance, uint8_t *val, uint8_t len); \
+    msg_t (*setPortOb)(void *instance, uint8_t modify, uint8_t val); \
+    msg_t (*getPortOb)(void *instance, uint8_t *val); \
 
 struct PCF8574VMT {
     _pcf8574_methods
@@ -90,17 +90,17 @@ typedef struct PCF8574Driver {
 /* Driver macros.                                                            */
 /*===========================================================================*/
 
-#define pcf8574SetPortMulti(ip, modify, val, len) \
-    (ip)->vmt->set_port_multi(ip, modify, val, len)
+#define pcf8574SetPort(ip, modify, val, len) \
+    (ip)->vmt->setPort(ip, modify, val, len)
 
-#define pcf8574GetPortMulti(ip, val) \
-    (ip)->vmt->get_port_multi(ip, val, len)
+#define pcf8574GetPort(ip, val) \
+    (ip)->vmt->getPort(ip, val, len)
 
-#define pcf8574SetPortOnce(ip, modify, val) \
-    (ip)->vmt->set_port_once(ip, modify, val)
+#define pcf8574SetPortOb(ip, modify, val) \
+    (ip)->vmt->setPortOb(ip, modify, val)
 
-#define pcf8574GetPortOnce(ip, val) \
-    (ip)->vmt->get_port_once(ip, val)
+#define pcf8574GetPortOb(ip, val) \
+    (ip)->vmt->getPortOb(ip, val)
 
 /*===========================================================================*/
 /* External declarations.                                                    */
